@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:cxf="http://www.mulesoft.org/schema/mule/cxf" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:jdbc-ee="http://www.mulesoft.org/schema/mule/ee/jdbc" xmlns:context="http://www.springframework.org/schema/context" xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper" xmlns:sap="http://www.mulesoft.org/schema/mule/sap" xmlns:ftp="http://www.mulesoft.org/schema/mule/ee/ftp" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:spring="http://www.springframework.org/schema/beans" version="EE-3.5.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd
+http://www.mulesoft.org/schema/mule/sap http://www.mulesoft.org/schema/mule/sap/current/mule-sap.xsd
+http://www.mulesoft.org/schema/mule/ee/ftp http://www.mulesoft.org/schema/mule/ee/ftp/current/mule-ftp-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/jdbc http://www.mulesoft.org/schema/mule/ee/jdbc/current/mule-jdbc-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/cxf http://www.mulesoft.org/schema/mule/cxf/current/mule-cxf.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd">
+<context:property-placeholder location="classpath:id003ww-qa.properties"/>
+    <data-mapper:config name="DataMapper" transformationGraphPath="ZFICheck_YES.grf" doc:name="DataMapper"/>
+    <data-mapper:config name="DataMapper1" transformationGraphPath="ZFICheck_NO.grf" doc:name="DataMapper"/>
+    <sap:connector name="SAP_FD1" jcoAsHost="${sap.host}" jcoUser="${sap.user}" jcoPasswd="${sap.password}" jcoSysnr="${sap.sys}" jcoClient="${sap.client}" validateConnections="true" doc:name="SAP"/>    
+    <flow name="ID003wwFlow1" doc:name="ID003wwFlow1" processingStrategy="synchronous">
+<!--         <sap:inbound-endpoint type="idoc" rfcType="trfc" jcoGwHost="${sap.host}" jcoGwService="${sap.service}" jcoProgramId="${sap.programId}" responseTimeout="10000" connector-ref="SAP_DEV" doc:name="SAP" outputXml="true" xmlVersion="2"> -->
+<!--           <sap:default-in-memory-tid-store/>  -->
+<!-- 			<sap:mule-object-store-tid-store> -->
+<!--       			<managed-store storeName="sap-tid-store" persistent="true"/> -->
+<!--    			</sap:mule-object-store-tid-store> -->
+<!--         </sap:inbound-endpoint> -->
+        <sap:inbound-endpoint type="idoc" xmlVersion="2" outputXml="true" responseTimeout="10000" doc:name="SAP" connector-ref="SAP_FD1" rfcType="trfc" jcoGwHost="${sap.host}" jcoGwService="${sap.service}" jcoProgramId="${sap.programId}">
+            <sap:mule-object-store-tid-store>
+                <managed-store storeName="sap-object-store" persistent="true"/>
+            </sap:mule-object-store-tid-store>
+        </sap:inbound-endpoint>
+        <sap:object-to-xml doc:name="SAP Object to XML"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="idoctype" value="#[xpath:name(/*)]" doc:name="Variable2"/>
+        <choice doc:name="Choice">
+            <when expression="#[idoctype == '${sap.idoctype}']">
+                <set-variable variableName="country" value="#[xpath('/Z_FI_GEN_CREDIT_LIMIT0101/IDOC/Z1ZCAS_IDOC_HEADER01/LAND1/text()').text]" doc:name="Variable"/>
+                <logger message="#['Country is ' + country]" level="INFO" doc:name="Logger"/>
+                <enricher  doc:name="Message Enricher" target="#[variable:zfiOutput]">
+                    <flow-ref name="ZFICheck" doc:name="Flow Reference"/>
+                </enricher>
+                <logger message="#['ZFI param check result is ' + zfiOutput]" level="INFO" doc:name="Logger"/>
+                <choice doc:name="Choice">
+                    <when expression="#[zfiOutput == 'YES']">
+                        <data-mapper:transform config-ref="DataMapper" doc:name="ZFI_YES"/>
+                        <flow-ref name="FileWrite" doc:name="Flow Reference"/>
+                    </when>
+                    <when expression="#[zfiOutput == 'NO']">
+                        <data-mapper:transform config-ref="DataMapper1" doc:name="ZFI_NO"/>
+                        <flow-ref name="FileWrite" doc:name="Flow Reference"/>
+                    </when>
+                    <otherwise>
+                        <logger level="INFO" doc:name="ZFI_EMPTY"/>
+                        <component class="com.invenio.mulepoc.id003ww.ErrorHandler" doc:name="Throw Error"/>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <logger message="#['Received IDOC is not of type '+ '${sap.idoctype}' + ', but of type ' + idoctype ]" level="WARN" doc:name="Invalid IDocType"/>
+            </otherwise>
+        </choice>
+    </flow>
+    <sub-flow name="ZFICheck" doc:name="ZFICheck">
+        <custom-transformer class="com.invenio.mulepoc.id003ww.ZFIInput" doc:name="ZFIInput"/>
+        <flow-ref name="ZFIWsCall" doc:name="Flow Reference"/>
+        <custom-transformer class="com.invenio.mulepoc.id003ww.ZFIOutput" doc:name="ZFIOutput"/>
+    </sub-flow>
+    <sub-flow name="ZFIWsCall" doc:name="ZFIWsCall">
+        <cxf:jaxws-client operation="${zfi.ws.operation}" clientClass="${zfi.ws.class}" port="${zfi.ws.port}" doc:name="SOAP"/>
+        <http:outbound-endpoint exchange-pattern="request-response" host="${zfi.host}" port="${zfi.port}" path="${zfi.path}" method="POST" doc:name="HTTP"/>
+    </sub-flow>
+    <sub-flow name="FileWrite" doc:name="FileWrite">
+<!-- 	     <file:outbound-endpoint path="${target.dir}" outputPattern="#[country + '/' + 'ID003.' + country + '.' + server.dateTime.format('yyyyMMdd') + '.' + server.dateTime.format('HHmmssSSS') + '.txt']" responseTimeout="10000" doc:name="File"/> -->
+        <file:outbound-endpoint path="${target.dir}" outputPattern="#[country + '/' + 'ID003.' + country + '.' + message.id + '.txt']" responseTimeout="10000" doc:name="File"/>
+    </sub-flow>
+</mule>
