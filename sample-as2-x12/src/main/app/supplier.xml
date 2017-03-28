@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:as2="http://www.mulesoft.org/schema/mule/as2" xmlns:x12-edi="http://www.mulesoft.org/schema/mule/x12-edi" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/as2 http://www.mulesoft.org/schema/mule/as2/current/mule-as2.xsd
+http://www.mulesoft.org/schema/mule/x12-edi http://www.mulesoft.org/schema/mule/x12-edi/current/mule-x12-edi.xsd">
+    <http:connector name="supplier-receive-http-connector" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS"/>
+    <http:endpoint exchange-pattern="request-response" host="localhost" port="8082" path="x12-850" connector-ref="supplier-receive-http-connector" method="POST" name="supplier-receive-http-endpoint" doc:name="HTTP"/>
+    <http:connector name="supplier-send-http-connector" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS"/>
+    <http:endpoint exchange-pattern="request-response" host="localhost" port="8081" path="x12-997" connector-ref="supplier-send-http-connector" method="POST" name="supplier-send-http-endpoint" doc:name="HTTP"/>
+    <as2:config name="supplier-send-as2-config" httpEndpointRef="supplier-send-http-endpoint" doc:name="AS2: Configuration"/>
+    <as2:config name="supplier-receive-as2-config" httpEndpointRef="supplier-receive-http-endpoint" doc:name="AS2: Configuration"/>
+    <x12-edi:config name="SUPPLIER_X12_EDI" doc:name="X12 EDI">
+        <x12-edi:schemas>
+            <x12-edi:schema>/x12/005010/850.esl</x12-edi:schema>
+        </x12-edi:schemas>
+    </x12-edi:config>
+    <flow name="supplierFlow">
+        <as2:receive config-ref="supplier-receive-as2-config" doc:name="AS2 (Streaming)"/>
+        <x12-edi:read config-ref="SUPPLIER_X12_EDI" doc:name="X12 EDI - Read 850"/>
+        <logger message="After parsing: #[payload]" level="INFO" doc:name="Logger"/>
+        <set-payload value="#[ ['TransactionSets' : [ 'v005010' : [ '997' : payload.FunctionalAcksGenerated ] ] ] ]" doc:name="Set Payload - 997"/>
+        <logger message="997 payload: #[payload]" level="INFO" doc:name="Logger"/>
+        <x12-edi:write config-ref="SUPPLIER_X12_EDI" doc:name="X12 EDI - Write 997"/>
+        <as2:send config-ref="supplier-send-as2-config" as2From="MY-SUPPLIER" as2To="MOUNTAINOUT" doc:name="AS2"/>
+    </flow>
+</mule>

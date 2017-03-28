@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:cluster="http://www.mulesoft.org/schema/mule/ee/cluster"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	<http:listener-config name="HTTP_Listener_Configuration"
+		host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration" />
+	<context:property-placeholder location="dev.properties" />
+	<configuration doc:name="Configuration">
+		<expression-language autoResolveVariables="true">
+			<import class="org.mule.util.StringUtils" />
+			<import class="org.mule.util.ArrayUtils" />
+		</expression-language>
+	</configuration>
+	<file:connector name="File" autoDelete="true"
+		outputAppend="true" streaming="true" validateConnections="true"
+		doc:name="File" />
+	<flow name="sample-batch-moduleFlow">
+		<http:listener config-ref="HTTP_Listener_Configuration"
+			path="/testBatch" doc:name="HTTP" />
+		<batch:execute name="sample-batch-moduleBatch" doc:name="sample-batch-moduleBatch" />
+	</flow>
+	<batch:job name="sample-batch-moduleBatch">
+		<batch:input>
+			<set-variable variableName="tables" value="${tables}"
+				doc:name="Variable" />
+			<set-payload value="#[flowVars.tables.split(',')]"
+				doc:name="Set Payload" />
+		</batch:input>
+		<batch:process-records>
+			<batch:step name="Batch_Step">
+				<logger message="Table name #[payload]" level="INFO"
+					doc:name="Logger" />
+                <batch:commit size="2" doc:name="Batch Commit">
+                    <vm:outbound-endpoint exchange-pattern="one-way" path="temp" doc:name="VM"/>
+                </batch:commit>
+			</batch:step>
+		</batch:process-records>
+		<batch:on-complete>
+			<logger
+				message="Successul records: #[payload.successfulRecords] | Failed records: #[payload.failedRecords]"
+				level="INFO" doc:name="Logger" />
+		</batch:on-complete>
+	</batch:job>
+    <flow name="sample-batch-moduleFlow1">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="temp" doc:name="VM"/>
+        <logger message="#[groovy:message.getPayloadAsString()]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message metadata:id="4738272b-5eeb-467d-996a-238f635c0abc" doc:name="Transform Message">
+            <dw:input-payload doc:sample="D:\temp\input.json" mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload mapObject {
+     name : $$,
+     value : $
+ }]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+	<batch:job name="sampleBatchJob" max-failed-records="-1">
+		<batch:input>
+			<file:inbound-endpoint path="src/main/resources/Input"
+				moveToPattern="#[message.inboundProperties.originalFilename].zip"
+				moveToDirectory="src/main/resources" responseTimeout="10000"
+				doc:name="File">
+				<file:filename-regex-filter pattern=".*csv"
+					caseSensitive="true" />
+			</file:inbound-endpoint>
+			<file:file-to-string-transformer
+				doc:name="File to String" />
+			<set-payload value="#[payload.replaceAll(&quot;,,&quot;, &quot;, ,&quot;)]"
+				doc:name="Set Payload" />
+			<splitter
+				expression="#[rows=StringUtils.split(message.payload,'\r\n');ArrayUtils.subarray(rows,1,rows.size())]"
+				doc:name="Splitter" />
+		</batch:input>
+		<batch:process-records>
+			<batch:step name="Batch_Step_0">
+				<logger message="#[payload]" level="INFO" doc:name="Logger" />
+				<batch:set-record-variable variableName="inputRecord"
+					value="#[payload]" doc:name="capture record" />
+				<expression-transformer expression="#[StringUtils.split(message.payload,',')]"
+					doc:name="Expression" />
+				<logger
+					message="#[message.payload[0]], #[message.payload[1]], #[message.payload[2]]"
+					level="INFO" doc:name="Logger" />
+			</batch:step>
+			<batch:step name="Batch_Step1" accept-policy="ONLY_FAILURES">
+				<logger message="Failed:: #[groovy:message.getPayloadAsString()]"
+					level="INFO" doc:name="Logger" />
+				<set-payload value="#[recordVars.inputRecord + System.lineSeparator()] "
+					doc:name="Set Payload" />
+				<file:outbound-endpoint path="src/main/resources"
+					outputPattern="BadRecords.txt" responseTimeout="10000" doc:name="File"
+					connector-ref="File" />
+			</batch:step>
+		</batch:process-records>
+	</batch:job>
+</mule>

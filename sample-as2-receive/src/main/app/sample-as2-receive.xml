@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:as2="http://www.mulesoft.org/schema/mule/as2" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/as2 http://www.mulesoft.org/schema/mule/as2/current/mule-as2.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+    <http:connector name="as2-http-connector" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS"/>
+    <http:endpoint exchange-pattern="request-response" host="localhost" port="8081" connector-ref="as2-http-connector" method="POST" name="receive-as2-http-endpoint" doc:name="HTTP" path="as2"/>
+    <as2:config name="AS2" httpEndpointRef="receive-as2-http-endpoint" doc:name="AS2: Configuration"/>
+    <flow name="sample-as2-receiveFlow">
+        <as2:receive config-ref="AS2" doc:name="AS2 (Streaming)"/>
+        <file:outbound-endpoint path="D:\temp\input" outputPattern="data.txt" responseTimeout="10000" doc:name="File"/>
+    </flow>
+</mule>

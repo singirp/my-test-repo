@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:oauth2="http://www.mulesoft.org/schema/mule/oauth2" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/oauth2 http://www.mulesoft.org/schema/mule/oauth2/current/mule-oauth2.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <http:request-config name="HTTP_Request_Configuration" protocol="HTTPS" host="api.github.com" port="443" doc:name="HTTP Request Configuration">
+        <oauth2:authorization-code-grant-type clientId="0ce9067e9c1bd51a3ca9" clientSecret="1e9b7b89dd9d8ec5a1b9aa4f201c8751b2a0c9f5" redirectionUrl="http://localhost:8082/callback">
+            <oauth2:authorization-request authorizationUrl="https://github.com/login/oauth/authorize" localAuthorizationUrl="https://localhost:8082/login"/>
+            <oauth2:token-request tokenUrl="https://github.com/login/oauth/access_token">
+                <oauth2:token-response accessToken="#[payload.'access_token']" refreshToken="#[payload.'access_token']"/>
+            </oauth2:token-request>
+        </oauth2:authorization-code-grant-type>
+    </http:request-config>
+    <flow name="sample-oauth-grant-codeFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/github" doc:name="HTTP"/>
+        <http:request config-ref="HTTP_Request_Configuration" path="/user" method="GET" doc:name="HTTP"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+ payload]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+</mule>

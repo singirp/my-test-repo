@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:partner-manager="http://www.mulesoft.org/schema/mule/partner-manager" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:as2="http://www.mulesoft.org/schema/mule/as2" xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper" xmlns:x12-edi="http://www.mulesoft.org/schema/mule/x12-edi" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd
+http://www.mulesoft.org/schema/mule/x12-edi http://www.mulesoft.org/schema/mule/x12-edi/current/mule-x12-edi.xsd
+http://www.mulesoft.org/schema/mule/as2 http://www.mulesoft.org/schema/mule/as2/current/mule-as2.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/partner-manager http://www.mulesoft.org/schema/mule/partner-manager/current/mule-partner-manager.xsd">
+
+    <x12-edi:config name="X12_EDI" doc:name="X12 EDI" groupIdPartner="MY-SUPPLIER" groupIdSelf="MOUNTAINOUT" interchangeIdPartner="MY-SUPPLIER" interchangeIdQualifierPartner="ZZ" interchangeIdQualifierSelf="ZZ" interchangeIdSelf="MOUNTAINOUT" useB2BProvider="true">
+		<x12-edi:schemas>
+			<x12-edi:schema>/x12/005010/850.esl</x12-edi:schema>
+        </x12-edi:schemas>			
+    </x12-edi:config>
+    
+    <as2:partner-manager-config name="send-customer-as2-config" httpEndpointRef="send-customer-http-endpoint" standard="EDI_X12" doc:name="AS2"/>
+    <http:endpoint exchange-pattern="request-response" host="${as2.http.host}" port="${as2.http.port}" method="POST" name="send-customer-http-endpoint" doc:name="HTTP" connector-ref="HTTP_HTTPS"/>
+    <as2:partner-manager-config name="receive-customer-as2-config" httpEndpointRef="receive-customer-http-endpoint" standard="EDI_X12" doc:name="AS2"/>
+    <http:endpoint exchange-pattern="request-response" host="localhost" port="8082" method="POST" name="receive-customer-http-endpoint" doc:name="HTTP" connector-ref="HTTP_HTTPS"/>
+    <http:connector name="HTTP_HTTPS" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS"/>
+    <data-mapper:config name="XML_To_X12" transformationGraphPath="xml_to_850.grf" doc:name="XML_To_X12"/>
+    <as2:config name="customer-as2-send-config" httpEndpointRef="send-customer-http-endpoint" doc:name="AS2: Configuration"/>
+    <as2:config name="customer-as2-receive-config" httpEndpointRef="receive-customer-http-endpoint" doc:name="AS2: Configuration"/>
+    
+    <flow name="send-850-to-supplier-flow">
+        <file:inbound-endpoint responseTimeout="10000" doc:name="File" path="outbox"/>
+        <data-mapper:transform doc:name="XML To X12 850" config-ref="XML_To_X12"/>
+        <x12-edi:write config-ref="X12_EDI" doc:name="Write 850"/>
+        <as2:send config-ref="send-customer-as2-config" as2From="MOUNTAINOUT" as2To="MY-SUPPLIER" doc:name="Send 850 to Supplier"/>
+    </flow>
+    
+    <flow name="receive-997-from-supplier-flow">
+        <as2:receive config-ref="receive-customer-as2-config" doc:name="Receive 997 from Supplier"/>
+        <x12-edi:read config-ref="X12_EDI" doc:name="Parse 997"/>
+    </flow>
+</mule>

@@ -1,0 +1,187 @@
+= Custom OAuth Provider
+
+Custom OAuth Provider demonstrates the usage of a custom http://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/org/springframework/security/authentication/AuthenticationProvider.html[AuthenticationProvider] that can authenticate credentials against any security service. Once authenticated, this provider can return details to the Mule application, which then provides an access token to the client. This provides an alternative for authentication when MuleSoft's built in LDAP functionality is not desired. This example is compliant with MuleSoft's External OAuth Provider policy, allowing other gateways to validate against this provider. The http://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/org/springframework/security/authentication/AuthenticationProvider.html[AuthenticationProvider] implementation is a single class that can be seen at link:./src/main/java/com/mulesoft/AuthProvider.java[AuthProvider.java]. This artifact contains a sample Mule application that demonstrates how this provider works and is a starting template for your own OAuth provider.
+
+== AuthProvider implementation
+
+Before reading this section, it is assumed you're comfortable with Spring's https://docs.spring.io/spring-security/site/docs/4.1.x/apidocs[AuthenticationProvider]. The authenticate method receives an http://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/org/springframework/security/core/Authentication.html[Authentication] object from the Mule application. From here, whatever logic is desired can be implemented. A new http://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/org/springframework/security/core/Authentication.html[Authentication] object can be returned, which represents the authenticated user. Consider the following implementation from link:./src/main/java/com/mulesoft/AuthProvider.java[AuthProvider.java].
+
+[source%nowrap,java]
+----
+public Authentication authenticate(Authentication credentials) throws AuthenticationException {
+  Authentication auth = null;
+  String username = credentials.getName();
+  String password = credentials.getCredentials().toString();
+  Map<String, String> userDetails = callExternalAuthentication(username, password);
+
+  if (isUserAuthenticated(userDetails)) {
+    List<GrantedAuthority> grantedAuths = new ArrayList<GrantedAuthority>();
+    grantedAuths.add(new SimpleGrantedAuthority(DEFAULT_GRANT));
+    UserDetails principal = new User(userDetails.get(USER_KEY), password, grantedAuths);
+    auth = new UsernamePasswordAuthenticationToken(principal, password, grantedAuths);
+  }
+
+  return auth;
+}
+----
+
+In this implementation, we create a new http://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/org/springframework/security/core/Authentication.html[Authentication] object. We extract the username and password from the http://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/org/springframework/security/core/Authentication.html[Authentication] object that was passed in as an argument from Mule. We then execute `callExternalAuthentication` which returns data from an external security service. The proceeding if statement checks to see if the user is valid based on the back end response. If `isUserAuthentication` returns true, we infer the user is valid. We now construct the http://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/org/springframework/security/core/Authentication.html[Authentication] object, auth, to be returned to Mule. Creating this https://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/[Authentication] object requires setting up a list of http://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/org/springframework/security/core/GrantedAuthority.html[GrantedAuthority]s and http://docs.spring.io/spring-security/site/docs/4.1.x/apidocs/org/springframework/security/core/userdetails/UserDetails.html[UserDetails]. If the user was never authenticated, the authenticate method returns null, signifying denied access.
+
+== Mule implementation
+
+Mule makes use of the oauth2-provider module for provisioning tokens. In this module's config, we specify a `resourceOwnerSecurityProvider-ref`.
+
+[source%nowrap,xml]
+----
+<oauth2-provider:config
+  name="oauth2-provider"
+  providerName="${oauth.provider.name}"
+  resourceOwnerSecurityProvider-ref="resourceOwnerSecurityProvider"
+  <!-- multiple attributes removed for brevity -->
+</oauth2-provider:config>
+----
+
+The resourceOwnerSecurityProvider is defined in the `mule-ss:security-manager` registered to the application. The provider defined delegates to a `ss:authentication-manager`.
+
+[source%nowrap,xml]
+----
+<mule-ss:security-manager name="multiple-users-security-manager" doc:name="Spring Security Provider">
+  <mule-ss:delegate-security-provider name="resourceOwnerSecurityProvider" delegate-ref="resourceOwnerAuthenticationManager"/>
+</mule-ss:security-manager>
+----
+
+The `ss:authentication-manager` contains a authentication provider, which references the Mule instance of AuthProvider.java.
+
+[source%nowrap,xml]
+----
+<ss:authentication-manager id="resourceOwnerAuthenticationManager">
+  <ss:authentication-provider ref="authProvider" />
+</ss:authentication-manager>
+----
+
+The AuthProvider is defined as a singleton in the application. The properties defined represent multiple configurations (class members) held in the AuthProvider class.
+[source%nowrap,xml]
+----
+<spring:bean class="com.mulesoft.AuthProvider" id="authProvider" scope="singleton">
+  <spring:property name="authenticationHost" value="${http.authenticate.host}"/>
+  <spring:property name="authenticationPort" value="${http.authenticate.port}"/>
+  <spring:property name="authenticationPath" value="${http.authenticate.path}"/>
+  <spring:property name="authenticationHTTPConnector" value="httpAuthentication"/>
+</spring:bean>
+----
+
+== Testing this provider
+
+This application is self contained and uses a mockSecurityProvider flow to validate whether provided credentials are valid. Upon validation, an OAuth token is provisioned and returned to the client.
+
+. Setup the runtime to register with Anypoint Platform.
++
+[source,txt]
+----
+# example from wrapper.conf
+wrapper.java.additional.<n>=-Danypoint.platform.client_id=ORG-CLIENT-ID-HERE
+wrapper.java.additional.<n>=-Danypoint.platform.client_secret=ORG-SECRET-HERE
+----
+
+. Start the runtime
++
+[source,txt]
+----
+# mule example
+$MULE_HOME/bin/mule start
+# gateway example
+$MULE_HOME/bin/gateway start
+----
+
+. Install the application to a Mule runtime. (API Gateway 2.x+ or Mule 3.8.0+)
++
+[source,txt]
+----
+mvn install
+----
+
+. Verify the application is running.
++
+[source,txt]
+----
+INFO  2016-05-20 17:54:00,880 [Mule.app.deployer.monitor.1.thread.1] org.mule.module.launcher.MuleDeploymentService:
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++ Started app 'oauth2-provider-1.0.0-SNAPSHOT'             +
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+----
+
+. Login to Anypoint Platform and retrieve a clientID and clientSecret from a registered application.
++
+[source,txt]
+----
+clientId:
+  adf4c494b2e44031afc80fd0268b1da1
+clientSecret:
+  68611f95ac7c40b596203D3885FADDB9
+----
+
+. Base64 encode the clientID and Secret pair per the https://tools.ietf.org/html/rfc2617#section-2[HTTP basic authentication spec]. (superseded by 7235, but more concisely defined in the former)
++
+[source,txt]
+----
+$ echo 'adf4c494b2e44031afc80fd0268b1da1:68611f95ac7c40b596203D3885FADDB9' | base64
+----
++
+[source,txt]
+----
+YWRmNGM0OTRiMmU0NDAzMWFmYzgwZmQwMjY4YjFkYTE6Njg2MTFmOTVhYzdjNDBiNTk2MjAzRDM4ODVGQUREQjkK
+----
+
+. Send a request through with invalid user/password credentials; take note of the basic auth header, included from the step above.
++
+[source,txt]
+----
+curl -i -X POST \
+ -H "Content-Type: application/x-www-form-urlencoded" \
+ -H "Authorization: Basic YWRmNGM0OTRiMmU0NDAzMWFmYzgwZmQwMjY4YjFkYTE6Njg2MTFmOTVhYzdjNDBiNTk2MjAzRDM4ODVGQUREQjk=" \
+ -d \
+ 'grant_type=password&username=max&password=donkey' \
+ 'https://localhost:8082/external/access_token' -k
+----
+NOTE: The cert is self-signed and can cause issues with some HTTP clients. Hence the -k parameter in the curl command above.
+
+. Verify the response.
+
+. Send a request through with valid user/password credentials; take note of the basic auth header, included from the step above.
++
+[source,txt]
+----
+curl -i -X POST \
+ -H "Content-Type: application/x-www-form-urlencoded" \
+ -H "Authorization: Basic YWRmNGM0OTRiMmU0NDAzMWFmYzgwZmQwMjY4YjFkYTE6Njg2MTFmOTVhYzdjNDBiNTk2MjAzRDM4ODVGQUREQjk=" \
+ -d \
+ 'grant_type=password&username=max&password=mule' \
+ 'https://localhost:8082/external/access_token' -k
+----
+NOTE: The password has changed to `mule`. Username `max` and password `mule` are the expected credentials inside the mockSecurityProvider flow.
+
+. Verify the response.
++
+[source,json]
+----
+{
+  "access_token": "ACCESS_TOKEN",
+  "refresh_token": "REFRESH_TOKEN",
+  "token_type": "bearer",
+  "expires_in": 1799
+}
+----
+. Validate the Token (Optional)
++
+[source,txt]
+----
+https://localhost:8082/external/validate?access_token=jt_e8eNbDBi8jGx1Ya9afR9oyPIifkzMLncIKe_3ohlkbshcnTLsa1r4NzoXhNhdAgkk2y3kxSezrKR3OaCxZ
+ (replace the token)
+----
+NOTE: The validateTokenFlow is usually called automatically by a policy that intercepts the call to your API. If not, you can code it into your API (not recommended)
+
+. The OAuth2 Dance
++
+[subs=+macros]
+----
+For For a detailed explanation of the OAuth dance, see this link https://docs.mulesoft.com/mule-user-guide/v/3.8/mule-secure-token-service[Mule STS OAuth2.0a Example Application]

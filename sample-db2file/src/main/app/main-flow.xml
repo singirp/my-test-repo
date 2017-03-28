@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="main-flowFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/testDW" doc:name="HTTP"/>
+        <expression-component doc:name="Expression"><![CDATA[import java.util.ArrayList;
+import java.util.List;
+
+List months = new ArrayList();
+months.add('1');
+months.add('22');
+months.add('333');
+months.add('4444');
+payload = months;]]></expression-component>
+        <set-variable variableName="months" value="#[payload]" doc:name="Variable"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="fields"><![CDATA[%dw 1.0
+%output application/java
+---
+ (payload map ("'" ++ $ ++ "'") ) joinBy ","]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="#[flowVars.fields]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <sub-flow name="main-flowSub_Flow">
+        <set-variable variableName="months" value="#[new java.util.ArrayList()]" doc:name="Variable"/>
+    </sub-flow>
+</mule>

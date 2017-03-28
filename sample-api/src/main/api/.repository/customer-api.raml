@@ -1,0 +1,19 @@
+#%RAML 0.8
+baseUri: https://mocksvc.mulesoft.com/mocks/4c83b68d-9066-4660-8952-903cee744ca2
+title: Customer API
+version: 1.0
+/customer:
+  post:
+    body:
+       application/json:
+        schema: !include schemas/customer.json
+    responses:
+      200:
+        body:
+          application/json:
+            example: |
+              {"customerId": "12e3423"}
+      
+          
+          
+     

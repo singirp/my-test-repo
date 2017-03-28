@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <file:connector name="File" autoDelete="true" outputAppend="true" streaming="true" validateConnections="true" doc:name="File"/>
+<flow name="FileReadingFlow">
+     <file:inbound-endpoint path="D:\temp\input" responseTimeout="10000" doc:name="File"/>
+     <file:file-to-string-transformer doc:name="File to String"/>
+     <batch:execute name="FileWrittingBatchFlow" doc:name="FileWrittingBatchFlow"/>
+ </flow>
+ <batch:job name="FileWrittingBatchFlow">
+     <batch:input>
+         <set-payload value="#[payload.split('\n')]" doc:name="Set Payload"/>
+     </batch:input>
+     <batch:process-records>
+         <batch:step name="Batch_Step">
+             <batch:commit size="2" doc:name="Batch Commit">
+                    <expression-component doc:name="Expression"><![CDATA[StringBuilder sb=new StringBuilder();
+for(String s: payload)
+{
+	sb.append(s);
+	sb.append(System.lineSeparator());
+}
+payload= sb.toString();]]></expression-component>
+                 <file:outbound-endpoint path="D:\temp\output" outputPattern="output.txt" responseTimeout="10000" doc:name="File" connector-ref="File"/>
+             </batch:commit>
+         </batch:step>
+     </batch:process-records>
+     <batch:on-complete>
+         <logger message="All Done" level="INFO" doc:name="Logger"/>
+     </batch:on-complete>
+ </batch:job></mule>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <http:request-config name="HTTP_Request_Configuration" host="0.0.0.0" port="8082" basePath="location" doc:name="HTTP Request Configuration"/>
+    <http:listener-config name="LocationService_HTTP_Listener_Configuration" host="0.0.0.0" port="8082" basePath="location" doc:name="HTTP Listener Configuration"/>
+    <flow name="dynamic-endpointFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/cars" doc:name="HTTP"/>
+        <flow-ref name="getCustomerDetails" doc:name="getCustomerDetails"/>
+        <flow-ref name="getCustomerLocation" doc:name="getCustomerLocation"/>
+        <flow-ref name="getAvailableCars" doc:name="getAvailableCars"/>
+        <logger message="#[groovy:message.getPayloadAsString()]" level="INFO" doc:name="log response "/>
+    </flow>
+    <sub-flow name="getCustomerDetails">
+        <set-variable variableName="customerId" value="#[message.inboundProperties.'http.query.params'.customerId]" doc:name="capture customerId"/>
+        <logger message="Customer Id: #[flowVars.customerId]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="getCustomerLocation">
+        <set-variable variableName="customerLocation" value="#[message.inboundProperties.'http.query.params'.customerLocation]" doc:name="capture customerLocation"/>
+        <logger message="Customer Location: #[flowVars.customerLocation]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="getAvailableCars">
+        <logger message="Calling location service to fetch available cars" level="INFO" doc:name="Logger"/>
+        <http:request config-ref="HTTP_Request_Configuration" path="/#[flowVars.customerLocation]" method="GET" doc:name="HTTP"/>
+    </sub-flow>
+    <flow name="berlinLocationCarServiceFlow">
+        <http:listener config-ref="LocationService_HTTP_Listener_Configuration" path="/berlin" allowedMethods="GET" doc:name="HTTP"/>
+        <set-payload value="{&quot;sedan&quot;:&quot;2&quot;}" doc:name="Set Payload"/>
+    </flow>
+    <flow name="londonLocationCarServiceFlow">
+        <http:listener config-ref="LocationService_HTTP_Listener_Configuration" path="/london" allowedMethods="GET" doc:name="HTTP"/>
+        <set-payload value="{&quot;suv&quot;:&quot;3&quot;}" doc:name="Set Payload"/>
+    </flow>
+    <flow name="numbergLocationCarServiceFlow">
+        <http:listener config-ref="LocationService_HTTP_Listener_Configuration" path="/numberg" allowedMethods="GET" doc:name="HTTP"/>
+        <set-payload value="{&quot;mini&quot;:&quot;10&quot;}" doc:name="Set Payload"/>
+    </flow>
+</mule>

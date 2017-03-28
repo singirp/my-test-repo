@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <db:oracle-config name="Oracle_Configuration" host="localhost" port="1521" instance="sample" user="user" password="password" doc:name="Oracle Configuration"/>
+    <flow name="sample-dataweaveFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/test" doc:name="HTTP"/>
+        <set-payload value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;College&gt;
+       &lt;Student name=&quot;A&quot;&gt;
+       &lt;Marks&gt;
+       &lt;Maths Grade=&quot;A&quot;&gt;80&lt;/Maths&gt;
+       &lt;Science Grade=&quot;A&quot;&gt;80&lt;/Science&gt;
+       &lt;/Marks&gt;
+       &lt;/Student&gt;
+        &lt;Student name=&quot;B&quot;&gt;
+       &lt;Marks&gt;
+       &lt;Maths Grade=&quot;B&quot;&gt;70&lt;/Maths&gt;
+       &lt;Science Grade=&quot;B&quot;&gt;70&lt;/Science&gt;
+       &lt;/Marks&gt;
+       &lt;/Student&gt;       
+        &lt;Student name=&quot;C&quot;&gt;
+       &lt;Marks&gt;
+       &lt;Maths Grade=&quot;B&quot;&gt;60&lt;/Maths&gt;
+       &lt;Science Grade=&quot;B&quot;&gt;60&lt;/Science&gt;
+       &lt;/Marks&gt;
+       &lt;/Student&gt;
+       &lt;/College&gt;" doc:name="Set Payload"/>
+        <dw:transform-message metadata:id="7ea46235-b7c8-4e3d-951a-3530c1371129" doc:name="Transform Message">
+            <dw:input-payload doc:sample="D:\Users\psingire\Desktop\college.xml" mimeType="application/xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	College: {
+		(payload.College.*Student map ((student , indexOfStudent) -> {
+			Student: {
+				Marks: {
+					Maths @(Grade: student.Marks.Maths.@Grade): student.Marks.Maths ++ '-' ++ student.Marks.Maths.@Grade when student.Marks.Maths.@Grade == 'A' otherwise student.Marks.Maths,
+					Science @(Grade: student.Marks.Science.@Grade): student.Marks.Science ++ '-' ++ student.Marks.Science.@Grade when student.Marks.Science.@Grade == 'A' otherwise student.Marks.Science
+				}
+			}
+		}))
+	}
+}]]></dw:set-payload>
+            <dw:set-variable variableName="scores"><![CDATA[%dw 1.0
+%output application/json
+
+%function getMathsScore(grade) (payload.College.*Student.Marks[?($.Maths.@Grade==grade)].Maths)
+%function getScienceScore(grade) (payload.College.*Student.Marks[?($.Science.@Grade==grade)].Science)
+
+%function sumMathScores(grade) ((sum getMathsScore(grade)) default 0)
+%function sumScienceScores(grade) ((sum getScienceScore(grade)) default 0)
+%var mathsScore = sumMathScores("A") 
+%var scienceScore = sumScienceScores("A")
+
+---
+{
+	mathsScore: sumMathScores("A"),
+	scienceScore: sumScienceScores("A")
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="#[payload] #[flowVars.scores]" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>

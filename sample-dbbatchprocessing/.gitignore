@@ -1,0 +1,33 @@
+# ญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญ #
+# Studioญspecific
+# ญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญ #
+.studio/
+flows/
+target/
+*.mflow
+.mule/
+muleญproject.xml
+catalog/
+# ญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญ #
+# Eclipse files
+# ญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญ #
+.classpath
+.project
+.settings
+/workspace/
+.externalToolBuilders/
+*.launch
+.cproject
+# ญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญ #
+# Test remnants
+# ญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญญ #
+objectstore/
+.mule/
+*.log
+temp/
+repository/
+muleEmbeddedDB/
+activemqญdata/
+testdir/
+hostkey.ser
+*.h2.db

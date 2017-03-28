@@ -1,0 +1,41 @@
+<mule xmlns:s3="http://www.mulesoft.org/schema/mule/s3" xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:spring="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+    xmlns:ss="http://www.springframework.org/schema/security"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd
+http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.1.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd
+http://www.mulesoft.org/schema/mule/s3 http://www.mulesoft.org/schema/mule/s3/current/mule-s3.xsd">
+ 
+  <spring:beans>
+    <ss:authentication-manager alias="authenticationManager">
+      <ss:authentication-provider>
+        <ss:user-service id="userService">
+          <ss:user name="user" password="password" authorities="ROLE_ADMIN" />
+          <ss:user name="anon" password="anon" authorities="ROLE_ANON" />
+        </ss:user-service>
+      </ss:authentication-provider>
+    </ss:authentication-manager>
+  </spring:beans>
+ 
+  <mule-ss:security-manager name="_muleSecurityManager" doc:name="Spring Security Provider">
+      <mule-ss:delegate-security-provider name="memory-provider" delegate-ref="authenticationManager" />
+  </mule-ss:security-manager>
+ 
+  <http:listener-config name="HTTP_Listener_Configuration" host="localhost" port="8081" doc:name="HTTP Listener Configuration" />
+    
+ 
+  <flow name="SpringExample">
+    <http:listener config-ref="HTTP_Listener_Configuration" path="/testBA" doc:name="HTTP"/>
+      <logger level="INFO" message="## received" doc:name="Logger"/>
+      <http:basic-security-filter realm="mule-realm"/>     
+    <logger level="INFO" message="## passed security" doc:name="Logger"/>
+        
+  </flow>
+</mule>

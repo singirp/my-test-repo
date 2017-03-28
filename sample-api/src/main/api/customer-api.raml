@@ -1,0 +1,19 @@
+#%RAML 0.8
+baseUri: http://sample-api.cloudhub.io/
+title: Customer API
+version: 1.0
+/customer:
+  post:
+    body:
+       application/json:
+        schema: !include schemas/customer.json
+    responses:
+      200:
+        body:
+          application/json:
+            example: |
+              {"customerId": "12e3423"}
+      
+          
+          
+     

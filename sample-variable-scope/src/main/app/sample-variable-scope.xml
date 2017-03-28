@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <flow name="f1">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/testScope" doc:name="HTTP"/>
+        <set-variable variableName="f1" value="fv1" doc:name="Variable"/>
+        <enricher target="#[flowVars.f4]" doc:name="Message Enricher">
+            <processor-chain doc:name="Processor Chain">
+                <set-variable variableName="f2" value="pfv2" doc:name="Variable"/>
+                <set-payload value="some data" doc:name="Set Payload"/>
+            </processor-chain>
+        </enricher>
+        <flow-ref name="f3" doc:name="f3"/>
+        <logger message="f1:#[flowVars.f1] f2:#[flowVars.f2] f3:#[flowVars.f3]" level="INFO" doc:name="Logger"/>
+        <scatter-gather doc:name="Scatter-Gather"/>
+    </flow>
+    <flow name="f2">
+        <set-variable variableName="f2" value="fv2" doc:name="Variable"/>
+    </flow>
+    <sub-flow name="f3">
+        <set-variable variableName="f3" value="fv3" doc:name="Variable"/>
+    </sub-flow>
+</mule>

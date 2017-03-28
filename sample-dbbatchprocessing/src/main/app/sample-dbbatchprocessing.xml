@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:context="http://www.springframework.org/schema/context" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <db:generic-config name="MSSQL_Database_Configuration" url="jdbc:sqlserver://${mssql.server}:${mssql.port};databaseName=${mssql.database};user=${mssql.user};password=${mssql.password}" driverClassName="com.microsoft.sqlserver.jdbc.SQLServerDriver" doc:name="Generic Database Configuration"/>
+    <context:property-placeholder location="sampledbapp.properties"/>
+    <flow name="sample-dbbatchprocessingFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/testBatch" doc:name="HTTP"/>
+        <set-payload value="#[NullPayload.getInstance()]" doc:name="Set Payload"/>
+        <batch:execute name="sample-dbbatchprocessingBatch" doc:name="sample-dbbatchprocessingBatch"/>
+    </flow>
+    <batch:job name="sample-dbbatchprocessingBatch">
+        <batch:input>
+            <db:select config-ref="MSSQL_Database_Configuration" doc:name="Database" fetchSize="10000" streaming="true">
+                <db:parameterized-query><![CDATA[select * from loadtest]]></db:parameterized-query>
+            </db:select>
+        </batch:input>
+        <batch:process-records>
+            <batch:step name="Batch_Step">
+                <batch:commit  doc:name="Batch Commit" streaming="true">
+                    <db:insert config-ref="MSSQL_Database_Configuration" doc:name="Database">
+                        <db:parameterized-query><![CDATA[insert into loadtest5 values(#[payload.firstname], #[payload.middlename], #[payload.lastname], #[payload.address], #[payload.organisation])]]></db:parameterized-query>
+                    </db:insert>
+                    <logger message="inserted records" level="INFO" doc:name="Logger"/>
+                </batch:commit>
+            </batch:step>
+            <batch:step name="CaptureFailures" accept-policy="ONLY_FAILURES">
+                <logger message="Failed record: #[payload]" level="INFO" doc:name="Logger"/>
+            </batch:step>
+        </batch:process-records>
+        <batch:on-complete>
+            <logger message="Loaded: #[payload.loadedRecords] | Successful: #[payload.successfulRecords] | Failed: #[payload.failedRecords]" level="INFO" doc:name="Logger"/>
+        </batch:on-complete>
+    </batch:job>
+</mule>
