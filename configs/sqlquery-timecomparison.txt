@@ -1,0 +1,1 @@
+((to_char(SYSTIMESTAMP,'J')-to_char(a.CHANGEDATE,'J'))*86400+(to_char(SYSTIMESTAMP,'SSSSS')-to_char(a.CHANGEDATE,'SSSSS'))) <= #[flowVars.timeInSecs]

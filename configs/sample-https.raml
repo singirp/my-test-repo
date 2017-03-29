@@ -1,0 +1,40 @@
+#%RAML 1.0
+baseUri: https://sample-app.cloudhub.io
+title: Sample secure app
+version: 1.0
+protocols: HTTPS
+mediaType: application/json
+securedBy: basicAuth
+securitySchemes: 
+  basicAuth:
+    type: Basic Authentication    
+    describedBy: 
+      headers: 
+        Authorization:
+          type: string
+          description: Base64 encoded "username:password"
+      responses: 
+        401:
+          description: Unauthorized. Invalid username and password combination.
+
+/test:
+  description: test resource
+  get:    
+    queryParameters:      
+      id:
+        type: integer
+        required: false    
+        description: id to get   
+    responses: 
+      200:
+        body:
+          application/json:
+            example: |
+              {"message":"Success","value":"some value"}
+        
+      500:
+        body:
+          application/json:
+            example: |
+              {"message":"Error details"}
+          

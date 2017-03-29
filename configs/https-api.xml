@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:s3="http://www.mulesoft.org/schema/mule/s3" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/s3 http://www.mulesoft.org/schema/mule/s3/current/mule-s3.xsd">
+    
+    
+    <flow name="sample-main">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/api/*" doc:name="HTTP"/>
+        <http:basic-security-filter realm="mule-realm"/>
+        <logger message="#['Request Received From: ' + message.inboundProperties.'http.remote.address' + &quot; To: &quot; + message.inboundProperties.'http.method' + message.inboundProperties.'http.relative.path']" level="INFO" doc:name="Logger"/>
+        <apikit:router config-ref="sample-config" doc:name="APIkit Router"/>
+        <exception-strategy ref="sample-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="sample-console">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/console/*" doc:name="HTTP"/>        
+        <apikit:console config-ref="sample-config" doc:name="APIkit Console"/>
+    </flow>
+    <flow name="get:/report:sample-config">
+        <set-variable variableName="loggingId" value="#[&quot;getreport_&quot; + server.dateTime.withTimeZone('GMT').format('yyyy-MM-dd-HH:mm:ss:S')]" doc:name="Variable"/>
+        <expression-component doc:name="capture time interval"><![CDATA[flowVars.intervalInMins = 60;
+String sInterval = message.inboundProperties.'http.query.params'.intervalInMinutes;
+if(sInterval != null && sInterval.length() > 0){
+	flowVars.intervalInMins = Integer.parseInt(sInterval);
+}]]></expression-component>
+        <logger message="#[flowVars.loggingId + ': Request received to generate report for workorders created/updated in the last ' + flowVars.intervalInMins + ' minutes']" level="INFO" doc:name="Logger"/>
+        <flow-ref name="generate-report" doc:name="generate-report"/>
+        
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-property propertyName="http.status" value="500" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;#[exception.getMessage()]&quot; }" doc:name="Set Payload"/>
+        </catch-exception-strategy>
+    
+    </flow>
+    
+</mule>
